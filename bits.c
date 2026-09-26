@@ -1,7 +1,7 @@
 /* 
  * CS:APP Data Lab 
  * 
- * <Please put your name and userid here>
+ * userid: gfy1729
  * 
  * bits.c - Source file with your solutions to the Lab.
  *          This is the file you will hand in to your instructor.
@@ -146,7 +146,8 @@ NOTES:
  *   Rating: 1
  */
 int signMask(void) {
-  return 1;
+  /* Since large integers are forbidden, use a shift to calculate it */
+  return 1 << 31;
 }
 
 // P2
@@ -158,7 +159,17 @@ int signMask(void) {
  *   Rating: 2
  */
 int bitXor(int x, int y) {
-	return 2;
+  /* It is known that "a xor b = (a or b) and not(a and b)", but operator | is 
+   * forbidden here. Luckily, a or b = not(not a and not b).
+   * So a ^ b = ~(~a & ~b) & ~(a & b).
+   */
+  int not_x = ~x;
+  int not_y = ~y;
+  int not_x_or_y = not_x & not_y;
+  int x_or_y = ~not_x_or_y;
+  int x_and_y = x & y;
+  int not_x_and_y = ~x_and_y;
+	return x_or_y & not_x_and_y;
 }
 
 // P3
@@ -169,8 +180,19 @@ int bitXor(int x, int y) {
  *   Max ops: 6
  *   Rating: 3
  */
-int negativePart(int x){
-  return 3;
+int negativePart(int x) {
+  /* First, we arithmetically rshift x for 31 bits and what we get (sgn) is
+   * -1 if x < 0 and 0 if x > 0. So the answer should be x times sgn.
+   * Operator * is not allowed, but ((x ^ sgn) | (~sgn)) + 1 is the same.
+   * For x < 0, ~sgn = 0, sgn = -1, so the expression is equal to
+   * (~x) + 1. In 2's Complement, this is the negative part of x.
+   * For x > 0, sgn = 0, ~sgn = -1, so the expression is equal to
+   * (x | -1) + 1 = -1 + 1 = 0.
+   */
+  int sgn = x >> 31;
+  int t1 = x ^ sgn;
+  int t2 = t1 | ~sgn;
+  return t2 + 1;
 }
 
 
@@ -185,7 +207,20 @@ int negativePart(int x){
  *   Rating: 4
  */
 int copyByteWithin(int x, int src, int dst) {
-  return 4;
+  /* The idea is to extract the src byte and move it to the dst byte. In order to
+   * save operators, first rshift the src byte to the least significant byte and mask
+   * it with 0xff, and then lshift it to the dst byte. Finally, remove the dst byte 
+   * from x and replace it with src_at_dst.
+   */
+  int src_delta = src << 3;
+  int dst_delta = dst << 3;
+  int dst_mask = 0xff << dst_delta;
+  int temp = x >> src_delta;
+  int src_byte0 = temp & 0xff;
+  int src_at_dst = src_byte0 << dst_delta;
+  int rev_dst_mask = ~dst_mask;
+  int x_no_dst = x & rev_dst_mask;
+  return x_no_dst | src_at_dst;
 }
 
 // P5
@@ -198,7 +233,17 @@ int copyByteWithin(int x, int src, int dst) {
  *   Rating: 4
  */
 int logicalShift(int x, int n) {
-  return 5;
+  /* The difference between logical shift and arithmetic shift is the n-highest bits.
+   * The solution exploits shifts and bit_or to create a mask whose value is 0 on the n
+   * preluding bits and 1 on the others. Applying the mask on the arithmetic shift
+   * result with bit_and yields the logical shift result.
+   */
+  int int_min = 1 << 31;
+  int rev_mask_t = int_min >> n;
+  int mask_t = ~rev_mask_t;
+  int mask = mask_t << 1 | 1;
+  int arith_shift = x >> n;
+  return mask & arith_shift;
 }
 
 // P6
@@ -210,7 +255,16 @@ int logicalShift(int x, int n) {
  *   Rating: 4
  */
 int swapNibblePairs(int x) {
-  return 6;
+  /* Create 2 masks to process the high-4 bits and the low-4 bits of each
+   * byte separately. Note that the preluding ones that may appear due to arithmetic
+   * rshift must be removed - this is done by a bit-and operation with a mask.
+   */
+  int mask_high_t = 0xf0 | 0xf0 << 8;
+  int mask_high = mask_high_t | mask_high_t << 16;
+  int mask_low_t = 0x0f | 0x0f << 8;
+  int mask_low = mask_low_t | mask_low_t << 16;
+  int ans_high = (x & mask_high) >> 4;
+  return (ans_high & mask_low) | (x & mask_low) << 4;
 }
 
 // P7
@@ -223,7 +277,13 @@ int swapNibblePairs(int x) {
  *   Rating: 4
  */
 int secondLowestZeroBit(int x) {
-  return 7;
+  /* We know that x & -x = x & ((~x) + 1) yields a mask of the lowest 1 bit in x. This is sometimes called a
+   * lowbit operation. So reverse x, remove the lowest 1 bit in the reversed x, and then apply lowbit again.
+   */
+  int rev_x = ~x;
+  int lowbit_x = rev_x & (x + 1);
+  int y = rev_x ^ lowbit_x;
+  return y & ((~y) + 1);
 }
 
 // P8
