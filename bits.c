@@ -296,7 +296,13 @@ int secondLowestZeroBit(int x) {
  *   Rating: 5
  */
 int oddParity(int x) {
-  return 8;
+  /*
+   */
+  int mask3__ = 0x01 | 0x01 << 4;
+  int mask3_ = mask3__ | mask3__ << 8;
+  int mask3 = mask3_ | mask3_ << 16;
+  int t = (x & mask3) ^ (x >> 1 & mask3) ^ (x >> 2 & mask3) ^ (x >> 3 & mask3);
+  return !(1 & (t ^ (t >> 4) ^ (t >> 8) ^ (t >> 12) ^ (t >> 16) ^ (t >> 20) ^ (t >> 24) ^ (t >> 28)));
 }
 
 // P9
@@ -309,7 +315,19 @@ int oddParity(int x) {
  *   Rating: 5
  */
 int rotateRightBits(int x, int n) {
-  return 9;
+  /* Separate the lower bits with the higher bits with a mask. Then lshift the lower
+   * part by (32 - n) bits - implemented as lshift (31 ^ n) and then lshift 1, so as to 
+   * avoid operator - and undefined behavior (lshift by 32). When rshifting the higher
+   * part, use another mask to cover the preluding 1s that arithmetic rshift may produce.
+   */
+  int delta = 31 ^ n;
+  int mask = (1 << n) + (~0);
+  int low_x = mask & x;
+  int high_ans = (low_x << delta) << 1;
+  int high_x = ~mask & x;
+  int mask2 = (mask << delta) << 1;
+  int low_ans = ~mask2 & (high_x >> n);
+  return high_ans | low_ans;
 }
 
 // P10
@@ -324,7 +342,22 @@ int rotateRightBits(int x, int n) {
  *   Rating: 5
  */
 int roundEvenPow2(int x, int n) {
-  return 10;
+  /* The answer is apparent when x is not exactly halfway between 2 multiples - 
+   * (x >> n) + (x >> (n - 1) & 1), which is represented in code as normal_ans.
+   * When x is halfway in between, x_low = x & (1 << n) - 1 must be 2 to the 
+   * (n - 1)-th power. Here, operator ! and ^ is exploited to avoid using ==.
+   * So the expression !(delta & ~x_high) is 0 only when x is halfway in between
+   * two multiples and the smaller multiple is the answer.
+   */
+  int minus1 = ~0;
+  int n_minus_1 = n + minus1;
+  int keybit = x >> n_minus_1 & 1;
+  int x_high = x >> n;
+  int normal_ans = x_high + keybit;
+  int mask_low = (1 << n) + minus1;
+  int x_low = x & mask_low;
+  int delta = !(x_low ^ (1 << n_minus_1));
+  return (normal_ans + (~0) + (!(delta & ~x_high))) << n;
 }
 
 // P11
@@ -340,7 +373,23 @@ int roundEvenPow2(int x, int n) {
  *   Rating: 5
  */
 int midpointTowardFirst(int x, int y) {
-  return 11;
+  /* The idea is to calculate (y - x) / 2 and round it toward 0 without overflow, and add it to x. The could be thought of
+   * as using 33-bit integers (that is, 32 higher bits plus 1 most insignificant bit) to store intermediate results. 
+   * The full expression is (for 33-bit integers) x + round_toward_0((y + (~x) + 1) / 2). The result of round_toward_0(t)
+   * is identical to t >> 1 when t is even, t >> 1 when t is odd and positive, and (t >> 1) + 1 when t is odd and negative.
+   * So the rounding process is implemented by first calculating (y + (~x) + 1) >> 1 under 33-bit integers, and then 
+   * adding 1 to the result when y + (~x) + 1 is odd and negative.
+   */
+  int rx = (~x);
+  int rx_high = rx >> 1;
+  int sum_mx_bit1 = (rx & 1) + 1;
+  int mx_high = rx_high + (sum_mx_bit1 >> 1);
+  int sum_of_bit1 = (y & 1) + (sum_mx_bit1 & 1);
+  int bit1_of_sum = 1 & sum_of_bit1;
+  int sum_high = (y >> 1) + (mx_high) + (sum_of_bit1 >> 1);
+  int sgn_sum_high = sum_high >> 31;
+  int delta = bit1_of_sum & (sgn_sum_high & 1);
+  return x + sum_high + delta;
 }
 
 
