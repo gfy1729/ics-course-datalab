@@ -320,13 +320,14 @@ int rotateRightBits(int x, int n) {
    * avoid operator - and undefined behavior (lshift by 32). When rshifting the higher
    * part, use another mask to cover the preluding 1s that arithmetic rshift may produce.
    */
-  int delta = 31 ^ n;
-  int mask = (1 << n) + (~0);
+  int _n = n & 31;
+  int delta = 31 ^ _n;
+  int mask = (1 << _n) + (~0);
   int low_x = mask & x;
   int high_ans = (low_x << delta) << 1;
   int high_x = ~mask & x;
   int mask2 = (mask << delta) << 1;
-  int low_ans = ~mask2 & (high_x >> n);
+  int low_ans = ~mask2 & (high_x >> _n);
   return high_ans | low_ans;
 }
 
