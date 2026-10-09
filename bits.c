@@ -553,7 +553,33 @@ unsigned floatScaleThreeHalves(unsigned uf) {
  *   Rating: 10
  */
 unsigned floatRoundEven(unsigned uf) {
-  return 16;
+  /* First, when exp >= 150, uf is either NaN, infinity, or a number whose absolute value is greater than 2^23. In all these cases, returned uf unchanged.
+   * When exp < 126, uf is a number whose absolute value is less than 0.5. In this case, the answer is either 0 or -0.
+   * When exp == 126, uf is a number whose absolute value is between 0.5 and 1.5. In this case, the answer is either 0 or -0 or 1 or -1.
+   * Else, uf is a number whose absolute value is between 1.5 and 2^23. In this case, the answer is either the integer part of uf or the integer part of uf plus 1.
+   * The condition for rounding up is that the fraction part is greater than 0.5 or the fraction part is equal to 0.5 and the integer part is odd.
+   */
+  unsigned sgn = uf & 0x80000000;
+  unsigned exp = (uf >> 23) & 0xff;
+  unsigned frc = uf & 0x7fffff;
+  if (exp >= 150)
+    return uf;
+  if (exp < 126)
+    return sgn;
+  if (exp == 126)
+    return sgn | (frc ? 0x3f800000 : 0);
+  unsigned mask_key = 1 << (149 - exp);
+  unsigned mask_low = mask_key - 1;
+  unsigned frc_rounded = frc;
+  if ((frc & mask_key) && ((frc & mask_low) || exp == 127 || (mask_key << 1 & frc))) 
+    frc_rounded = frc + mask_key;
+  frc_rounded = frc_rounded & ~(mask_low | mask_key);
+  unsigned exp2 = exp;
+  if (frc_rounded >= 0x800000) {
+    frc_rounded = 0;
+    exp2++;
+  }
+  return sgn | exp2 << 23 | frc_rounded;
 }
 
 // P17
@@ -567,7 +593,32 @@ unsigned floatRoundEven(unsigned uf) {
  *   Rating: 10
  */
 unsigned float_i2f(int x) {
-  return 17;
+  if (x == 0)
+    return 0;
+  unsigned sgn = x & 0x80000000;
+  unsigned abs_x = sgn ? 0u -x : x;
+  unsigned exp = -1;
+  unsigned frc = 0;
+  unsigned abs_x_temp = abs_x;
+  while (abs_x_temp) {
+    abs_x_temp >>= 1;
+    exp++;
+  }
+  if (exp <= 23) {
+    frc = abs_x << (23 - exp);
+  } else {
+    unsigned shift = exp - 23;
+    unsigned mask_key = 1 << (shift - 1);
+    unsigned mask_low = mask_key - 1;
+    frc = abs_x >> shift;
+    if ((abs_x & mask_key) && ((abs_x & mask_low) || (frc & 1))) 
+      frc++;
+    if (frc >= 0x1000000) {
+      frc >>= 1;
+      exp++;
+    }
+  }
+  return sgn | ((exp + 127) << 23) | (frc & 0x7fffff);
 }
 
 
@@ -581,7 +632,16 @@ unsigned float_i2f(int x) {
  *   Rating: 10
  */
 int bitCount(int x) {
-  return 18;
+  int temp_mask0 = 0x55 | (0x55 << 8);
+  int mask0 = temp_mask0 | (temp_mask0 << 16);
+  int temp_mask1 = 0x33 | (0x33 << 8);
+  int mask1 = temp_mask1 | (temp_mask1 << 16);
+  int temp_mask2 = 0x0f | (0x0f << 8);
+  int mask2 = temp_mask2 | (temp_mask2 << 16);
+  int r0 = (x & mask0) + ((x >> 1) & mask0);
+  int r1 = (r0 & mask1) + ((r0 >> 2) & mask1);
+  int r2 = (r1 & mask2) + ((r1 >> 4) & mask2);
+  return (r2 + (r2 >> 8) + (r2 >> 16) + (r2 >> 24)) & 0xff;
 }
 
 // P19
@@ -593,7 +653,15 @@ int bitCount(int x) {
  *   Max ops: 34
  *   Rating: 10
  */
-int bitReverse(int x)
-{
-  return 19;
+int bitReverse(int x) {
+  int mask4 = 0xff | (0xff << 8);
+  int mask3 = mask4 ^ (mask4 << 8);
+  int mask2 = mask3 ^ (mask3 << 4);
+  int mask1 = mask2 ^ (mask2 << 2);
+  int mask0 = mask1 ^ (mask1 << 1);
+  int r0 = ((x >> 1) & mask0) | ((x & mask0) << 1);
+  int r1 = ((r0 >> 2) & mask1) | ((r0 & mask1) << 2);
+  int r2 = ((r1 >> 4) & mask2) | ((r1 & mask2) << 4);
+  int r3 = ((r2 >> 8) & mask3) | ((r2 & mask3) << 8);
+  return ((r3 >> 16) & mask4) | (r3 << 16);
 }
