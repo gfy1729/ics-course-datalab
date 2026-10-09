@@ -555,8 +555,8 @@ unsigned floatScaleThreeHalves(unsigned uf) {
 unsigned floatRoundEven(unsigned uf) {
   /* First, when exp >= 150, uf is either NaN, infinity, or a number whose absolute value is greater than 2^23. In all these cases, returned uf unchanged.
    * When exp < 126, uf is a number whose absolute value is less than 0.5. In this case, the answer is either 0 or -0.
-   * When exp == 126, uf is a number whose absolute value is between 0.5 and 1.5. In this case, the answer is either 0 or -0 or 1 or -1.
-   * Else, uf is a number whose absolute value is between 1.5 and 2^23. In this case, the answer is either the integer part of uf or the integer part of uf plus 1.
+   * When exp == 126, uf is a number whose absolute value is in [0.5, 1). In this case, the answer is either 0 or -0 or 1 or -1.
+   * Else, uf is a number whose absolute value is in [1, 2^23). In this case, the answer is either the integer part of uf or the integer part of uf plus 1.
    * The condition for rounding up is that the fraction part is greater than 0.5 or the fraction part is equal to 0.5 and the integer part is odd.
    */
   unsigned sgn = uf & 0x80000000;
