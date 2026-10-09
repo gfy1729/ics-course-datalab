@@ -519,15 +519,17 @@ unsigned floatScaleThreeHalves(unsigned uf) {
   unsigned frc = uf & 0x7fffff;
   if (exp == 255)
     return uf;
-  unsigned temp_frc3 = (frc << 1) + frc;
-  unsigned frc_rounded = (temp_frc3 + ((temp_frc3 & 3) == 3)) >> 1;
   if (exp == 0) {
+    unsigned temp_frc3 = (frc << 1) + frc;
+    unsigned frc_rounded = (temp_frc3 + ((temp_frc3 & 3) == 3)) >> 1;
     unsigned exp2 = 0;
     if (frc_rounded >= 0x800000)
       exp2 = 1;
     return sgn | (exp2 << 23) | (frc_rounded & 0x7fffff);
   }
   frc = frc | 0x800000;
+  unsigned temp_frc3 = (frc << 1) + frc;
+  unsigned frc_rounded = (temp_frc3 + ((temp_frc3 & 3) == 3)) >> 1;
   unsigned exp2 = exp;
   if (frc_rounded >= 0x1000000) {
     exp2 = exp + 1;
