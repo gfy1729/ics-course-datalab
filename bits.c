@@ -404,7 +404,33 @@ int midpointTowardFirst(int x, int y) {
  *   Rating: 7
  */
 int isBetweenEitherOrder(int x, int a, int b) {
-  return 12;
+  /* x does not lie in the inclusive interval [a, b] if and only if both of the following conditions are satisfied: 
+   * i) a - x != 0 and x - b != 0;
+   * ii) sgn(a - x) != sgn(x - b), where sgn(a) = a / abs(a).
+   * Once again, to calculate (a - x) and (x - b) without overflow, we simulate every 33-bit integer with two 32-bit integers.
+   * Then we use a mix of bitwise operations and arithmetic operations to implement the two conditions above.
+   */
+  int rx = (~x);
+  int rb = (~b);
+  int a_high = a >> 1;
+  int a_bit1 = a & 1;
+  int x_high = x >> 1;
+  int x_bit1 = x & 1;
+  int temp_mx = (rx & 1) + 1;
+  int mx_bit1 = temp_mx & 1;
+  int mx_high = (rx >> 1) + (temp_mx >> 1);
+  int temp_mb = (rb & 1) + 1;
+  int mb_high = (rb >> 1) + (temp_mb >> 1);
+  int mb_bit1 = temp_mb & 1;
+  int temp2 = a_bit1 + mx_bit1;
+  int a_x_high = a_high + mx_high + (temp2 >> 1);
+  int a_x_bit1 = temp2 & 1;
+  int temp3 = mb_bit1 + x_bit1;
+  int x_b_high = x_high + mb_high + (temp3 >> 1);
+  int x_b_bit1 = temp3 & 1;
+  int flag1 = !(((!a_x_high) & (!a_x_bit1)) | ((!x_b_high) & (!x_b_bit1)));
+  int flag2 = (a_x_high ^ x_b_high) >> 31 & 1;
+  return !(flag1 & flag2);
 }
 
 // P13
@@ -417,7 +443,25 @@ int isBetweenEitherOrder(int x, int a, int b) {
  *   Rating: 7
  */
 int mul5Sat(int x) {
-  return 13;
+  /* x * 5 = (x << 2) + x. To calculate this without overflow, we simulate 35-bit integers with two 32-bit integers. 3 lower bits are stored in *_low
+   * and the other 32 higher bits are stored in *_high. Then we check whether the 4 highest bits of the result - that is, the 32 ~ 35 bits of x * 5 - 
+   * are all 0 or all 1. If so, no overflow had occurred since x * 5 could still be represented with its lower 32 bits. 
+   * Otherwise, we return INT_MAX or INT_MIN depending on the sign of x. A bit mask is used to implement this selection process.
+   */
+  int mul4_high = x >> 1;
+  int mul4_low = (x & 1) << 2;
+  int x_high = x >> 3;
+  int x_low = x & 7;
+  int temp1 = mul4_low + x_low;
+  int mul5_low = temp1 & 7;
+  int mul5_high = mul4_high + x_high + (temp1 >> 3);
+  int temp2 = (mul5_high >> 28) & 15;
+  int flag = (!(temp2 ^ 15)) | (!temp2);
+  int mask_flag = (flag << 31) >> 31;
+  int mul5 = mul5_low | mul5_high << 3;
+  int sgn_x = (x >> 31) & 1;
+  int maxmin = (~(1 << 31)) + sgn_x;
+  return (mask_flag & mul5) | (~mask_flag & maxmin);
 }
 
 // P14
@@ -430,7 +474,24 @@ int mul5Sat(int x) {
  *   Rating: 7
  */
 int classifyAdd3(int x, int y, int z) {
-  return 14;
+  /* The sum of 3 integers may overflow, so once again we simulate 34-bit integers with two 32-bit integers. 2 lower bits are stored in *_low and 
+   * the other 32 higher bits are stored in *_high. Then we check whether the 3 highest bits of the result - that is, the 32 ~ 34 bits of (x + y + z) -
+   * are all 0 or all 1. If so, no overflow had occurred since x + y + z could still be represented with its lower 32 bits. 
+   * Otherwise, we return -1 or 1 depending on the sign of the sum. Bit masks and a mix of bit operations are used to implement this selection process.
+   */
+  int x_high = x >> 2;
+  int x_low = x & 3;
+  int y_high = y >> 2;
+  int y_low = y & 3;
+  int z_high = z >> 2;
+  int z_low = z & 3;
+  int temp1 = x_low + y_low + z_low;
+  int sum_high = x_high + y_high + z_high + (temp1 >> 2);
+  int temp2 = sum_high >> 29 & 7;
+  int flag_no_ovf = (!(temp2 ^ 7)) | (!temp2);
+  int mask_ovf = ((!flag_no_ovf) << 31) >> 31;
+  int mask_sgn = sum_high >> 31;
+  return mask_ovf & (mask_sgn + ((~mask_sgn) & 1));
 }
 
 // P15
@@ -447,7 +508,34 @@ int classifyAdd3(int x, int y, int z) {
  *   Rating: 7
  */
 unsigned floatScaleThreeHalves(unsigned uf) {
-  return 15;
+  /* The result is apparent when uf is NaN or infinity. Else, let uf = x * (2 ^ exp) where 1 < x < 2.
+   * Then uf * 3 / 2 = (3 * x / 2) * (2 ^ exp). If 3 * x / 2 < 2, then the exponent remains unchanged.
+   * Otherwise, the exponent is incremented by 1 and the fraction is halved.
+   * The value of x depends on whether uf is normal (1 + frc / (2 ^ 23)) or subnormal (frc / (2 ^ 23)).
+   * Rounding is done by adding 1 to the fraction when the 2 least significant bits are both 1.
+   */
+  unsigned sgn = uf & 0x80000000;
+  unsigned exp = (uf >> 23) & 0xff;
+  unsigned frc = uf & 0x7fffff;
+  if (exp == 255)
+    return uf;
+  unsigned temp_frc3 = (frc << 1) + frc;
+  unsigned frc_rounded = (temp_frc3 + ((temp_frc3 & 3) == 3)) >> 1;
+  if (exp == 0) {
+    unsigned exp2 = 0;
+    if (frc_rounded >= 0x800000)
+      exp2 = 1;
+    return sgn | (exp2 << 23) | (frc_rounded & 0x7fffff);
+  }
+  frc = frc | 0x800000;
+  unsigned exp2 = exp;
+  if (frc_rounded >= 0x1000000) {
+    exp2 = exp + 1;
+    frc_rounded = (frc_rounded + ((frc_rounded & 3) == 3)) >> 1;
+  }
+  if (exp2 == 255)
+    return sgn | 0x7f800000;
+  return (frc_rounded & 0x7fffff) | (exp2 << 23) | sgn;
 }
 
 // P16
